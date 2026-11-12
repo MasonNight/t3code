@@ -2,6 +2,7 @@ import "~/index.css";
 
 import { EnvironmentId } from "@t3tools/contracts";
 import { describe, expect, it, vi } from "vite-plus/test";
+import { userEvent } from "vite-plus/test/browser";
 
 import { InputGroup, InputGroupAddon, InputGroupInput } from "~/components/ui/input-group";
 import type { RightPanelSurface } from "~/rightPanelStore";
@@ -144,8 +145,13 @@ const BROWSER_SURFACE: RightPanelSurface = {
   resourceId: "tab-1",
 };
 const DIFF_SURFACE: RightPanelSurface = { id: "diff", kind: "diff" };
+const DEVICE_SURFACE: RightPanelSurface = {
+  id: "device:host:phone",
+  kind: "device",
+  target: { hostId: "host", deviceId: "phone", platform: "ios", name: "Phone" },
+};
 
-function panel(activeSurface: RightPanelSurface) {
+function panel(activeSurface: RightPanelSurface, overrides: Partial<RightPanelTabsProps> = {}) {
   const noop = () => {};
   const props: RightPanelTabsProps = {
     mode: "inline",
@@ -196,6 +202,7 @@ function panel(activeSurface: RightPanelSurface) {
         </InputGroup>
       </div>
     ),
+    ...overrides,
   };
   return <RightPanelTabs {...props} />;
 }
@@ -247,5 +254,30 @@ describe("right panel thumb buttons", () => {
     // The page canvas already went back in the tab; the panel must not go back a second time.
     releaseThumbButton(screen.getByTestId("page-canvas").element(), 3);
     expect(actions).toEqual(["back", "forward", "back"]);
+  });
+});
+
+describe("device tab rename", () => {
+  it.each([
+    { key: "Enter", isComposing: true, keyCode: 13 },
+    { key: "Enter", isComposing: false, keyCode: 229 },
+  ])("keeps editing through an IME-confirming Enter ($isComposing/$keyCode)", async (shape) => {
+    const onRenameDevice = vi.fn();
+    await using screen = await render(
+      panel(DEVICE_SURFACE, { surfaces: [DEVICE_SURFACE], onRenameDevice }),
+    );
+    await userEvent.dblClick(screen.getByText("Phone"));
+    const input = screen.getByRole("textbox", { name: "Device tab name" });
+    await userEvent.fill(input, "にほん");
+    input
+      .element()
+      .dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, cancelable: true, ...shape }));
+
+    expect(onRenameDevice).not.toHaveBeenCalled();
+    await expect.element(input).toHaveFocus();
+
+    await userEvent.fill(input, "日本語");
+    await userEvent.keyboard("{Enter}");
+    expect(onRenameDevice).toHaveBeenCalledExactlyOnceWith(DEVICE_SURFACE.id, "日本語");
   });
 });
