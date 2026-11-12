@@ -316,7 +316,10 @@ export function BranchToolbarBranchSelector({
   const isInitialBranchesLoadPending = branchRefState.isPending && branchRefState.data === null;
   const currentGitBranch =
     branchStatusQuery.data?.refName ?? refs.find((refName) => refName.current)?.name ?? null;
-  const sourceControlPresentation = getSourceControlPresentation(requestTerms);
+  const sourceControlPresentation = getSourceControlPresentation(
+    branchStatusQuery.data?.sourceControlProvider,
+    requestTerms,
+  );
   const SourceControlIcon = sourceControlPresentation.Icon;
   const canonicalActiveBranch = resolveBranchToolbarValue({
     envMode: effectiveEnvMode,
